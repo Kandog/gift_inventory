@@ -6,3 +6,9 @@ data/
 .expo/
 .env
 scripts/run-server.cmd
+
+# Downloaded or locally built app packages
+build/
+*.apk
+*.aab
+*.ipa
