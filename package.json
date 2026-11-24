@@ -1,0 +1,19 @@
+{
+  "name": "gift-inventory",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:server": "npm run dev -w @gifts/server",
+    "dev:dashboard": "npm run dev -w @gifts/dashboard",
+    "dev:mobile": "npm run start -w @gifts/mobile"
+  },
+  "overrides": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

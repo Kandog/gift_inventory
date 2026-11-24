@@ -1,0 +1,3 @@
+# Counts and Movements are append-only, and corrections are made by voiding
+
+Recorded entries are never edited or deleted. A mistake is fixed by Voiding the entry (keeping who, when and why) and recording a correct one. The dashboard offers a single "Void & correct" action. We chose this over in-place editing because offline phones sync out of order (ADR 0001): a Void is a single fact that syncs cleanly, whereas an edit can collide with other changes. It also keeps an honest history for explaining past stock changes. Staff may Void their own entries within 10 minutes of making them, measured from when the entry was made on the phone. Admins may Void any entry.
