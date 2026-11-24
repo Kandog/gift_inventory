@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import type { MovementKind } from '@gifts/shared';
-import { createEvent, eventsFor, photoSource, recordEntry, useStore } from '@/lib/store';
+import { confirmMode, createEvent, eventsFor, photoSource, recordEntry, useStore } from '@/lib/store';
 import { Button, Card, color, ErrorText, Field, H, Input, Muted, Screen, Segmented, todayIso } from '@/ui';
 
 const KINDS: { value: MovementKind; label: string }[] = [
@@ -97,6 +97,14 @@ export default function EntryScreen() {
             {gift.archived && <Text style={{ color: color.warn }}>Archived Gift</Text>}
           </View>
         </View>
+        <Segmented
+          value={mode}
+          options={[
+            { value: 'count', label: '🔢 Count' },
+            { value: 'movement', label: '⇄ Movement' },
+          ]}
+          onChange={(m) => void confirmMode(m)}
+        />
       </Card>
 
       {!isCount && (

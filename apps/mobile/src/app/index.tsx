@@ -3,8 +3,8 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { Redirect, Stack, useRouter } from 'expo-router';
 import { searchGifts } from '@gifts/shared';
 import { SyncBar } from '@/components/SyncBar';
-import { useStore } from '@/lib/store';
-import { Button, color, Input, Muted, Row } from '@/ui';
+import { confirmMode, useStore } from '@/lib/store';
+import { Button, color, Input, Muted, Row, Segmented } from '@/ui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
@@ -41,11 +41,21 @@ export default function HomeScreen() {
       />
       <View style={{ padding: 16, gap: 12 }}>
         <SyncBar />
-        <Pressable onPress={() => router.push('/mode')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ color: color.muted }}>Mode:</Text>
-          <Text style={{ fontWeight: '700', color: color.accent }}>{mode === 'count' ? 'Count (what is on the shelf)' : 'Movement (in / out)'}</Text>
-          <Text style={{ color: color.muted }}>· change</Text>
-        </Pressable>
+        <View style={{ gap: 6 }}>
+          <Segmented
+            value={mode}
+            options={[
+              { value: 'count', label: '🔢 Count' },
+              { value: 'movement', label: '⇄ Movement' },
+            ]}
+            onChange={(m) => void confirmMode(m)}
+          />
+          <Muted>
+            {mode === 'count'
+              ? 'Count: the number you enter replaces what is on the shelf.'
+              : 'Movement: add (Receive) or remove (Issue, Write-off) gifts, or Transfer them.'}
+          </Muted>
+        </View>
         <Button big title="📷  Scan a Gift" onPress={() => router.push('/scan')} />
         <Input value={query} onChangeText={setQuery} placeholder="…or type a Gift name" autoCorrect={false} clearButtonMode="while-editing" />
       </View>
