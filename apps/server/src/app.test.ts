@@ -257,6 +257,74 @@ describe('import, labels and export', () => {
     expect(stock.locations.map((l: { name: string }) => l.name).sort()).toEqual(['Storeroom', 'Van']);
   });
 
+  async function uploadCsv(csv: string, filename = 'gifts.csv') {
+    const boundary = 'X';
+    const payload = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: text/csv\r\n\r\n${csv}\r\n--${boundary}--\r\n`;
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/import/gifts',
+      payload,
+      headers: { cookie: adminCookie, 'content-type': `multipart/form-data; boundary=${boundary}` },
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json() as { created: number; updated: number; counts: number; errors: { row: number; message: string }[] };
+  }
+
+  it('exports Gifts as CSV that re-imports without changing anything', async () => {
+    const { pen, store } = await seed();
+    const ev = (await admin('POST', '/api/events', { name: 'Fair', startDate: '2026-11-20', endDate: '2026-11-21' })).json();
+    const phone = await staffPhone();
+    await phone.push({
+      entries: [
+        { id: randomUUID(), kind: 'receive', giftId: pen.id, locationId: store.id, quantity: 10, occurredAt: at('08:00') },
+        // Leaves the level negative: export must still round-trip.
+        { id: randomUUID(), kind: 'issue', giftId: pen.id, locationId: store.id, quantity: 14, eventId: ev.id, occurredAt: at('09:00') },
+      ],
+    });
+    await admin('POST', '/api/gifts', { name: 'Tote, "canvas"', barcodes: ['111', '222'], archived: true });
+    const before = (await admin('GET', '/api/entries')).json().total;
+
+    const csv = (await admin('GET', '/api/export/gifts.csv')).res.body;
+    expect(csv.split('\r\n')[0]).toBe('﻿ID,Name,Category,Unit Cost,Low Stock Threshold,Packs,Barcodes,Archived,Stock: Event booth,Stock: Storeroom');
+    expect(csv).toContain(`${pen.id},Blue pen,,0.5,50,Carton=50,,no,0,-4`);
+    expect(csv).toContain('"Tote, ""canvas"""');
+
+    const summary = await uploadCsv(csv);
+    expect(summary).toEqual({ created: 0, updated: 2, counts: 0, errors: [] });
+    expect((await admin('GET', '/api/entries')).json().total).toBe(before);
+    const gifts = (await admin('GET', '/api/gifts')).json();
+    expect(gifts.find((g: { name: string }) => g.name === 'Tote, "canvas"')).toMatchObject({ barcodes: ['111', '222'], archived: true });
+  });
+
+  it('applies edits from a re-imported export: rename by ID, new stock, archive', async () => {
+    const { pen } = await seed();
+    const csv = (await admin('GET', '/api/export/gifts.csv')).res.body;
+    const edited = csv.replace(`${pen.id},Blue pen,,0.5,50,Carton=50,,no,0,0`, `${pen.id},Blue logo pen,Pens,0.55,60,Carton=50; Box=10,999,yes,120,`);
+    const summary = await uploadCsv(edited);
+    expect(summary).toEqual({ created: 0, updated: 1, counts: 1, errors: [] });
+    const g = (await admin('GET', '/api/gifts')).json()[0];
+    expect(g).toMatchObject({ id: pen.id, name: 'Blue logo pen', unitCost: 0.55, lowStockThreshold: 60, barcodes: ['999'], archived: true });
+    expect(g.packs).toEqual([
+      { name: 'Box', pieces: 10 },
+      { name: 'Carton', pieces: 50 },
+    ]);
+    const stock = (await admin('GET', '/api/reports/stock?archived=1')).json();
+    expect(stock.rows[0].total).toBe(120);
+  });
+
+  it('accepts any column-name case and rejects unknown IDs', async () => {
+    const summary = await uploadCsv(['id,NAME,category,stock: storeroom', ',Yo-yo,Toys,12', 'not-a-real-id,Ghost,,'].join('\n'));
+    expect(summary.created).toBe(1);
+    expect(summary.counts).toBe(1);
+    expect(summary.errors).toEqual([{ row: 3, message: 'No Gift has ID not-a-real-id. Leave ID empty to create a new Gift.' }]);
+  });
+
+  it('offers the import template as CSV', async () => {
+    const res = await admin('GET', '/api/import/template.csv');
+    expect(res.res.body).toContain('ID,Name,Category,Unit Cost,Low Stock Threshold,Packs,Barcodes,Archived,Stock: Storeroom');
+    expect(res.res.body).toContain('Blue logo pen');
+  });
+
   it('renders a Gift Label PDF', async () => {
     const { pen } = await seed();
     const res = await admin('POST', '/api/labels.pdf', { items: [{ giftId: pen.id, copies: 3 }], sheet: 'a4-21', skip: 2 });

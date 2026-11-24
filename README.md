@@ -75,6 +75,47 @@ Use it to remove demo data (from `node scripts/seed-demo.mjs`, or a `data` folde
 4. Open the dashboard. It shows **“Create the first Admin”** again.
 5. Re-pair every phone: in the app, **Settings → Disconnect this phone**, then scan a new code from **Devices → Pair a phone**.
 
+## Importing and exporting Gifts (CSV)
+
+On the dashboard, **Gifts & labels** has **Export CSV / Export Excel** and **Import CSV / Excel**. Export and import use the same format, so the usual way to change many Gifts is to export, edit in Excel, and import.
+
+### Columns
+
+| Column | Required | What to put in it |
+|---|---|---|
+| `ID` | no | Leave **empty for a new Gift**. Exports fill it in; keep it to update that Gift, even if you change its name. |
+| `Name` | **yes** | e.g. `Blue logo pen`. Without an `ID`, an existing Gift with this name (ignoring case) is updated; otherwise a new one is created. |
+| `Category` | no | e.g. `Pens`. A new name creates the Category. |
+| `Unit Cost` | no | e.g. `0.85` (a `$` sign is fine). |
+| `Low Stock Threshold` | no | Whole number of Pieces across all Locations, e.g. `100`. |
+| `Packs` | no | `Name=Pieces`, separated by `;`, e.g. `Carton=50; Box=10`. |
+| `Barcodes` | no | Codes printed on the packaging, separated by `;`, e.g. `0123456789012; 0812345000017`. |
+| `Archived` | no | `yes` or `no`. Empty keeps the Gift as it is (new Gifts are not archived). |
+| `Stock: <Location>` | no | One column per Location, e.g. `Stock: Storeroom`, `Stock: Event booth`. The number of Pieces on that shelf. |
+
+Example:
+
+```csv
+ID,Name,Category,Unit Cost,Low Stock Threshold,Packs,Barcodes,Archived,Stock: Storeroom,Stock: Event booth
+,Blue logo pen,Pens,0.85,100,Carton=50; Box=10,0123456789012,no,420,30
+,Canvas tote bag,Bags,2.10,40,Bundle=10,,no,200,
+```
+
+### Rules
+
+- **Column names** ignore upper/lower case, and columns can be in any order. Only `Name` is required; leave out columns you don't use.
+- **Each row describes the whole Gift.** An empty cell clears that field: an empty `Packs` removes the Gift's Packs, for example. The exception is an empty `Archived`, which keeps the current state.
+- **Stock numbers set the shelf** (they're recorded as Counts by you, with the note "Imported"). An empty cell leaves that Location alone, and a number equal to the current stock is skipped, so re-importing an unchanged export records nothing. A `Stock:` column for a Location that doesn't exist yet creates it. Numbers must be whole and 0 or more.
+- **Bad rows are skipped, the rest are imported.** The import then lists each problem with its row number (the header is row 1), so you can fix those rows and import again.
+- **Excel** files (`.xlsx`) use the same columns. When saving from Excel, choose **CSV UTF-8** so names with accents survive.
+
+### Loading your existing data for the first time
+
+1. Create your Locations on **Locations & categories**, or just name them in `Stock:` columns.
+2. On **Gifts & labels → Import CSV / Excel**, download the **CSV template**. It already has a `Stock:` column for each Location.
+3. Fill one row per Gift, leaving `ID` empty, and put what's on each shelf in the `Stock:` columns.
+4. Import it. Check **Stock** and **Activity**: each starting quantity shows as a Count with the note "Imported".
+
 ## Phones
 
 **For testing now:** install **Expo Go** from the App Store / Play Store, then on a dev PC on the same Wi-Fi:

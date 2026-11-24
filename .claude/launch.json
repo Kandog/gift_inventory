@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "gift-server",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx", "apps/server/src/main.ts"],
-      "port": 8080
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set GIFTS_PORT=8090&& npx tsx apps/server/src/main.ts"],
+      "port": 8090,
+      "autoPort": false
     }
   ]
 }

@@ -28,7 +28,7 @@ import { runBackup } from './backup.js';
 import { getSetting, setSetting, type Db } from './db.js';
 import { renderLabelsPdf, SHEETS, type SheetKind } from './labels.js';
 import { alerts, eventReport, eventSummaries, stockOverview } from './reports.js';
-import { importGifts, importTemplate, readSpreadsheet, toCsv, toXlsx, type Cell, type Column } from './sheets.js';
+import { giftsTable, importGifts, importTemplate, importTemplateRows, readSpreadsheet, toCsv, toXlsx, type Cell, type Column } from './sheets.js';
 import {
   applySync,
   closeEvent,
@@ -343,6 +343,13 @@ export async function buildApp(opts: AppOptions) {
     return reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').send(await importTemplate(db));
   });
 
+  app.get('/api/import/template.csv', async (req, reply) => {
+    requireAdmin(req);
+    const t = importTemplateRows(db);
+    reply.header('Content-Disposition', 'attachment; filename="gift-import-template.csv"');
+    return reply.type('text/csv; charset=utf-8').send(toCsv(t.columns, t.rows));
+  });
+
   app.post('/api/import/gifts', async (req) => {
     const s = requireAdmin(req);
     const file = await req.file();
@@ -437,6 +444,7 @@ const KIND_LABEL: Record<EntryKind, string> = {
 };
 
 function exportTable(db: Db, report: string, q: Record<string, string>): { name: string; columns: Column[]; rows: Record<string, Cell>[] } {
+  if (report === 'gifts') return giftsTable(db); // same format the Gift import reads
   if (report === 'stock') {
     const s = stockOverview(db);
     return {

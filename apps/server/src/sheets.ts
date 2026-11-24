@@ -1,14 +1,16 @@
 import ExcelJS from 'exceljs';
 import { randomUUID } from 'node:crypto';
-import type { Entry, Pack } from '@gifts/shared';
+import { stockKey, type Entry, type Pack } from '@gifts/shared';
 import { tx, type Db } from './db.js';
 import {
   applySync,
   createGift,
   createLocation,
   DomainError,
+  listCategories,
   listGifts,
   listLocations,
+  stockMap,
   updateGift,
   upsertCategoryByName,
   type Actor,
@@ -44,27 +46,66 @@ export function toCsv(columns: Column[], rows: Record<string, Cell>[]): string {
   return '﻿' + lines.join('\r\n') + '\r\n'; // BOM so Excel opens UTF-8 correctly
 }
 
-// ---------- Import ----------
+// ---------- Gift CSV format (shared by export, template and import) ----------
 
-export const IMPORT_COLUMNS = ['Name', 'Category', 'Unit Cost', 'Low Stock Threshold', 'Packs', 'Barcodes'] as const;
+/** Fixed columns, in order. Then one "Stock: <Location>" column per Location. */
+export const GIFT_COLUMNS = ['ID', 'Name', 'Category', 'Unit Cost', 'Low Stock Threshold', 'Packs', 'Barcodes', 'Archived'] as const;
 const STOCK_PREFIX = 'stock:';
 
-export async function importTemplate(db: Db): Promise<Buffer> {
+const packsText = (packs: Pack[]) => packs.map((p) => `${p.name}=${p.pieces}`).join('; ');
+
+function giftColumns(db: Db): Column[] {
   const locs = listLocations(db).filter((l) => !l.archived);
-  const columns: Column[] = [
-    ...IMPORT_COLUMNS.map((h) => ({ header: h, key: h, width: h === 'Name' ? 30 : 18 })),
-    ...locs.map((l) => ({ header: `Stock: ${l.name}`, key: `Stock: ${l.name}`, width: 18 })),
+  return [
+    ...GIFT_COLUMNS.map((h) => ({ header: h, key: h, width: h === 'Name' ? 30 : h === 'ID' ? 38 : 18 })),
+    ...locs.map((l) => ({ header: `Stock: ${l.name}`, key: `Stock: ${l.name}`, width: 16 })),
   ];
+}
+
+/** Every Gift (including archived) in the import format, with current Stock Levels. */
+export function giftsTable(db: Db): { name: string; columns: Column[]; rows: Record<string, Cell>[] } {
+  const columns = giftColumns(db);
+  const locs = listLocations(db).filter((l) => !l.archived);
+  const cats = new Map(listCategories(db).map((c) => [c.id, c.name]));
+  const levels = stockMap(db);
+  const rows = listGifts(db).map((g) => {
+    const row: Record<string, Cell> = {
+      ID: g.id,
+      Name: g.name,
+      Category: g.categoryId ? (cats.get(g.categoryId) ?? '') : '',
+      'Unit Cost': g.unitCost,
+      'Low Stock Threshold': g.lowStockThreshold,
+      Packs: packsText(g.packs),
+      Barcodes: g.barcodes.join('; '),
+      Archived: g.archived ? 'yes' : 'no',
+    };
+    for (const l of locs) row[`Stock: ${l.name}`] = levels.get(stockKey(g.id, l.id)) ?? 0;
+    return row;
+  });
+  return { name: 'gifts', columns, rows };
+}
+
+/** The import format with one example row, for people starting a file from scratch. */
+export function importTemplateRows(db: Db): { columns: Column[]; rows: Record<string, Cell>[] } {
+  const columns = giftColumns(db);
   const example: Record<string, Cell> = {
+    ID: '',
     Name: 'Blue logo pen',
     Category: 'Pens',
     'Unit Cost': 0.85,
     'Low Stock Threshold': 100,
     Packs: 'Carton=50; Box=10',
     Barcodes: '0123456789012',
+    Archived: 'no',
   };
-  if (locs[0]) example[`Stock: ${locs[0].name}`] = 420;
-  return toXlsx('Gifts', columns, [example]);
+  const firstStock = columns.find((c) => c.header.toLowerCase().startsWith(STOCK_PREFIX));
+  if (firstStock) example[firstStock.key] = 420;
+  return { columns, rows: [example] };
+}
+
+export async function importTemplate(db: Db): Promise<Buffer> {
+  const t = importTemplateRows(db);
+  return toXlsx('Gifts', t.columns, t.rows);
 }
 
 export interface ImportSummary {
@@ -146,48 +187,80 @@ function parsePacks(text: string): Pack[] {
 
 const num = (s: string | undefined) => (s === undefined || s.trim() === '' ? null : Number(s.replace(/[$,]/g, '')));
 
+function parseArchived(s: string | undefined): boolean | null {
+  const v = (s ?? '').trim().toLowerCase();
+  if (v === '') return null;
+  if (['yes', 'y', 'true', '1', 'archived'].includes(v)) return true;
+  if (['no', 'n', 'false', '0', 'active'].includes(v)) return false;
+  throw new DomainError(`Archived must be yes or no (got "${s}")`);
+}
+
 /**
- * Creates or updates Gifts by name (case-insensitive). Starting quantities in "Stock: <Location>" columns
- * are recorded as ordinary Counts made by the importing Admin.
+ * Creates or updates Gifts from rows in the Gift CSV format. Column names ignore case.
+ * - A row with an ID updates that Gift (so it can be renamed); without an ID it matches by Name,
+ *   and creates a new Gift when no Gift has that name.
+ * - Each row describes the Gift completely: an empty Unit Cost, Packs, etc. clears that field.
+ *   An empty Archived keeps the Gift's current state.
+ * - "Stock: <Location>" values are recorded as Counts by the importing Admin. Empty cells and values
+ *   equal to the current Stock Level are skipped, so re-importing an export changes nothing.
  */
-export function importGifts(db: Db, actor: Actor, rows: RawRow[]): ImportSummary {
+export function importGifts(db: Db, actor: Actor, rawRows: RawRow[]): ImportSummary {
   const summary: ImportSummary = { created: 0, updated: 0, counts: 0, errors: [] };
   const now = new Date().toISOString();
   const counts: Entry[] = [];
+  const levels = stockMap(db);
+  // Match column names case-insensitively, but keep the original header for new Location names.
+  const rows = rawRows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.trim().toLowerCase(), v ?? ''])));
+  const stockHeaders = rawRows.map((r) => Object.keys(r).filter((k) => k.trim().toLowerCase().startsWith(STOCK_PREFIX)).map((k) => k.trim()));
 
   tx(db, () => {
     rows.forEach((r, i) => {
       const rowNo = i + 2; // header is row 1
-      const name = (r['Name'] ?? '').trim();
-      if (!name && !Object.values(r).some((v) => v.trim())) return; // blank line
+      const name = (r['name'] ?? '').trim();
+      if (!Object.values(r).some((v) => v.trim())) return; // blank line
       try {
         // Each row is its own savepoint: a bad row leaves nothing half-written.
         const outcome = tx(db, () => {
           if (!name) throw new DomainError('Name is empty');
-          const unitCost = num(r['Unit Cost']);
-          const threshold = num(r['Low Stock Threshold']);
+          const unitCost = num(r['unit cost']);
+          const threshold = num(r['low stock threshold']);
           if (unitCost !== null && Number.isNaN(unitCost)) throw new DomainError('Unit Cost is not a number');
           if (threshold !== null && Number.isNaN(threshold)) throw new DomainError('Low Stock Threshold is not a number');
+          const archived = parseArchived(r['archived']);
+          const id = (r['id'] ?? '').trim();
+          const gifts = listGifts(db);
+          const existing = id ? gifts.find((g) => g.id === id) : gifts.find((g) => g.name.toLowerCase() === name.toLowerCase());
+          if (id && !existing) throw new DomainError(`No Gift has ID ${id}. Leave ID empty to create a new Gift.`);
           const input = {
             name,
-            categoryId: r['Category']?.trim() ? upsertCategoryByName(db, r['Category']) : null,
+            categoryId: r['category']?.trim() ? upsertCategoryByName(db, r['category']) : null,
             unitCost,
             lowStockThreshold: threshold,
-            packs: parsePacks(r['Packs'] ?? ''),
-            barcodes: (r['Barcodes'] ?? '').split(/[;,\s]+/).filter(Boolean),
+            packs: parsePacks(r['packs'] ?? ''),
+            barcodes: (r['barcodes'] ?? '').split(/[;,\s]+/).filter(Boolean),
+            archived: archived ?? existing?.archived ?? false,
           };
-          const existing = listGifts(db).find((g) => g.name.toLowerCase() === name.toLowerCase());
-          const gift = existing ? updateGift(db, existing.id, { ...input, archived: existing.archived }) : createGift(db, input);
+          const gift = existing ? updateGift(db, existing.id, input) : createGift(db, input);
 
           const rowCounts: Entry[] = [];
-          for (const [header, value] of Object.entries(r)) {
-            if (!header.toLowerCase().startsWith(STOCK_PREFIX) || value.trim() === '') continue;
+          for (const header of stockHeaders[i] ?? []) {
+            const value = r[header.toLowerCase()] ?? '';
+            if (value.trim() === '') continue;
             const locName = header.slice(STOCK_PREFIX.length).trim();
-            const qty = Number(value);
-            if (!Number.isInteger(qty) || qty < 0) throw new DomainError(`"${header}" must be a whole number`);
-            const locId =
-              listLocations(db).find((l) => l.name.toLowerCase() === locName.toLowerCase())?.id ?? createLocation(db, locName).id;
-            rowCounts.push({ id: randomUUID(), kind: 'count', giftId: gift.id, locationId: locId, quantity: qty, userId: actor.id, occurredAt: now, note: 'Imported' });
+            const qty = Number(value.trim());
+            const locId = listLocations(db).find((l) => l.name.toLowerCase() === locName.toLowerCase())?.id;
+            if (locId && (levels.get(stockKey(gift.id, locId)) ?? 0) === qty) continue; // unchanged
+            if (!Number.isInteger(qty) || qty < 0) throw new DomainError(`"Stock: ${locName}" must be a whole number, 0 or more`);
+            rowCounts.push({
+              id: randomUUID(),
+              kind: 'count',
+              giftId: gift.id,
+              locationId: locId ?? createLocation(db, locName).id,
+              quantity: qty,
+              userId: actor.id,
+              occurredAt: now,
+              note: 'Imported',
+            });
           }
           return { created: !existing, rowCounts };
         });

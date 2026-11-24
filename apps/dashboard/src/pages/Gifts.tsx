@@ -35,7 +35,9 @@ export function GiftsPage() {
   return (
     <>
       <PageHeader title="Gifts & labels">
-        <button onClick={() => setImporting(true)}>Import spreadsheet</button>
+        <button onClick={() => download('/api/export/gifts.csv')}>Export CSV</button>
+        <button onClick={() => download('/api/export/gifts.xlsx')}>Export Excel</button>
+        <button onClick={() => setImporting(true)}>Import CSV / Excel</button>
         <button disabled={selected.size === 0} onClick={() => setPrinting(true)}>
           Print labels ({selected.size})
         </button>
@@ -343,20 +345,39 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     });
 
   return (
-    <Modal title="Import Gifts from a spreadsheet" onClose={onClose}>
-      <ol className="muted" style={{ paddingLeft: 18 }}>
+    <Modal title="Import Gifts (CSV or Excel)" onClose={onClose} wide>
+      <p>
+        <strong>To change existing Gifts:</strong>{' '}
+        <button className="small" onClick={() => download('/api/export/gifts.csv')}>
+          Export Gifts CSV
+        </button>
+        , edit it, and import it here.
+        <br />
+        <strong>To start a new list:</strong>{' '}
+        <button className="small" onClick={() => download('/api/import/template.csv')}>
+          CSV template
+        </button>{' '}
+        <button className="small" onClick={() => download('/api/import/template.xlsx')}>
+          Excel template
+        </button>
+      </p>
+      <ul className="muted" style={{ paddingLeft: 18 }}>
         <li>
-          <button className="small" onClick={() => download('/api/import/template.xlsx')}>
-            Download the template
-          </button>{' '}
-          and fill one row per Gift.
+          One row per Gift. Columns: <code>ID, Name, Category, Unit Cost, Low Stock Threshold, Packs, Barcodes, Archived</code>, then one{' '}
+          <code>Stock: &lt;Location&gt;</code> column per Location. Column names ignore upper/lower case, and only <code>Name</code> is required.
         </li>
-        <li>Gifts are matched by name: existing ones are updated, new ones are created.</li>
         <li>
-          Numbers in <code>Stock: &lt;Location&gt;</code> columns are recorded as Counts. Add a column per Location; missing Locations are created.
+          With an <code>ID</code> the row updates that Gift, which lets you rename it. Without one it matches by <code>Name</code>, or creates a new Gift.
         </li>
-        <li>Packs look like <code>Carton=50; Box=10</code>. Separate several barcodes with <code>;</code>.</li>
-      </ol>
+        <li>Each row describes the whole Gift: an empty cell clears that field, except an empty Archived, which keeps the current state.</li>
+        <li>
+          Packs look like <code>Carton=50; Box=10</code>. Separate several barcodes with <code>;</code>. Archived is <code>yes</code> or <code>no</code>.
+        </li>
+        <li>
+          <code>Stock: &lt;Location&gt;</code> numbers are recorded as Counts, which set the shelf to that number. Empty cells and unchanged numbers are skipped.
+          New Location names create that Location.
+        </li>
+      </ul>
       <input type="file" accept=".xlsx,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       {result && (
         <div className="panel" style={{ marginTop: 12 }}>
