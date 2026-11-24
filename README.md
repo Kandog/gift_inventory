@@ -121,9 +121,41 @@ npm run build:android
 
 > Anyone with the build link can download the app. That's harmless on its own, because the app does nothing without a pairing code from your dashboard. To require an Expo sign-in for downloads, change it in the project's settings on expo.dev.
 
-### iPhone app
+### iPhone app (TestFlight)
 
-iPhones need an Apple Developer account (Apple's paid program) to install apps outside the App Store, through TestFlight or registered devices. `ios.bundleIdentifier` in `apps/mobile/app.json` is still the placeholder `com.example.giftinventory` and must be set before the first iPhone build.
+Staff install the iPhone app through Apple's **TestFlight** app. The app ID is `com.kandog.giftinventory`. Builds run in the cloud, so no Mac is needed.
+
+**One-time setup:**
+
+1. **Join the Apple Developer Program** (US$99/year) at [developer.apple.com/programs](https://developer.apple.com/programs/) with your Apple ID. A free Apple ID can't install apps outside the App Store. Approval can take a day or two, longer for an organization.
+2. Sign in to Expo from the project folder (skip if you already did this for Android):
+   ```powershell
+   npx eas-cli@latest login
+   ```
+
+**Build and upload to TestFlight:** from the project folder, in your own terminal (it needs your Apple sign-in), run:
+
+```powershell
+npm run build:ios
+```
+
+- **The first time**, it asks you to sign in to Apple: your Apple ID, password and a two-factor code, then your team if you have more than one. Let it create the **distribution certificate** and **provisioning profile**. Expo stores them for later builds.
+- **The build** takes roughly 15–30 minutes plus Expo's queue. It then uploads to App Store Connect, creating the app there the first time.
+- **Processing:** Apple then processes the upload for about 10–30 minutes before it appears in TestFlight.
+- **Encryption question:** the app is marked as using no non-exempt encryption (`ios.config.usesNonExemptEncryption: false`), so builds don't get stuck at "Missing Compliance".
+
+**Give staff access (internal testing, no Apple review needed):**
+
+1. In [App Store Connect](https://appstoreconnect.apple.com), **Users and Access → +**: invite each staff member with their Apple ID email. The role can be anything; *Customer Support* is the least access. Up to 100 people.
+2. **Apps → Gift Inventory → TestFlight → Internal Testing**: create a group, add those users, and add the build.
+3. Each person gets an email. On their iPhone they install **TestFlight** from the App Store, accept the invite, and tap **Install**.
+4. Open **Gift Inventory**. When iOS asks to find devices on the local network, tap **Allow**, or the app can't reach the server. Then scan the pairing code from **Dashboard → Devices → Pair a phone** and sign in.
+
+**Updating:** run `npm run build:ios` again. TestFlight offers the update to everyone, and data and pairing are kept.
+
+**Every build expires after 90 days**, after which the app stops opening. Rebuild at least every ~2–3 months, even with no changes.
+
+> External testing (sharing a public TestFlight link with people who aren't App Store Connect users) needs Apple's Beta App Review. Apple's reviewers can't get past the pairing screen without your server, so stick to internal testers.
 
 ## Development
 

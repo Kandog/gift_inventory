@@ -11,7 +11,8 @@
     "dev:server": "npm run dev -w @gifts/server",
     "dev:dashboard": "npm run dev -w @gifts/dashboard",
     "dev:mobile": "npm run start -w @gifts/mobile",
-    "build:android": "npm run build:android -w @gifts/mobile"
+    "build:android": "npm run build:android -w @gifts/mobile",
+    "build:ios": "npm run build:ios -w @gifts/mobile"
   },
   "overrides": {
     "react": "19.3.0",
