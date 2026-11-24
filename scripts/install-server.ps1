@@ -31,8 +31,12 @@ if (-not $isAdmin) { throw 'Please run this in PowerShell opened with "Run as ad
 
 $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) { throw 'Node.js is not installed. Install Node.js 24 LTS from nodejs.org, then run this again.' }
-$major = [int]((& $node -p 'process.versions.node.split(".")[0]'))
-if ($major -lt 24) { throw "Node.js 24 or newer is required (found $major)." }
+# Parse "v24.19.0" ourselves: Windows PowerShell 5.1 strips embedded quotes from native-command
+# arguments, so a quoted script passed to `node -p` arrives broken.
+$nodeVersion = (& $node --version).Trim()
+if ($nodeVersion -notmatch '^v(\d+)\.') { throw "Could not read the Node.js version (got '$nodeVersion')." }
+$major = [int]$Matches[1]
+if ($major -lt 24) { throw "Node.js 24 or newer is required (found $nodeVersion)." }
 
 Write-Host '1/4 Installing packages and building the dashboard...' -ForegroundColor Cyan
 Push-Location $Repo
