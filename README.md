@@ -85,7 +85,45 @@ npm run dev:mobile
 
 Scan the QR code shown with Expo Go (Android) or the Camera app (iPhone). In the app, scan the pairing code from **Dashboard → Devices → Pair a phone**, then sign in.
 
-**For everyday use** the app needs a real build (Expo Go is for development). Build with EAS (`npx eas-cli build`). Android produces an `.apk` you can install directly. iPhones need an Apple Developer account to install outside the App Store (TestFlight or ad-hoc). `apps/mobile/app.json` uses placeholder bundle ids (`com.example.giftinventory`) that must be changed to your own first.
+**For everyday use** the app needs a real build. Expo Go is for development only.
+
+### Android app (.apk)
+
+Builds run in the cloud on Expo's build service (EAS), so no Android Studio is needed. The app ID is `com.kandog.giftinventory`. Don't change it after people have installed the app, or phones will treat it as a different app.
+
+**One-time setup:**
+
+1. Create a free account at [expo.dev](https://expo.dev).
+2. From the project folder, sign in:
+   ```powershell
+   npx eas-cli@latest login
+   ```
+
+**Build:** from the project folder, run:
+
+```powershell
+npm run build:android
+```
+
+- **The first time**, it offers to create an Expo project for the app. Answer **Yes**: this adds the project id to `apps/mobile/app.json`, so commit that change afterwards. When asked about Android signing, choose **Generate new keystore**. Expo stores the keystore and reuses it for every later build, which lets updates install over the old app.
+- **Build number:** each build gets the next one automatically.
+- **Version name:** the user-visible version is `version` in `apps/mobile/app.json`. Raise it when you release changes, e.g. `1.0.0` to `1.1.0`.
+- **Time:** builds take roughly 10–20 minutes, depending on Expo's queue.
+
+**Install on phones:**
+
+1. When the build finishes, the terminal prints a link to the build page on expo.dev. The page is also in your Expo account under the project's builds.
+2. Open that link on the Android phone (or send it to staff) and download the `.apk`.
+3. Open the downloaded file. Android asks to allow installing apps from this source (the browser or Files app). Allow it and install. Android warns because the app isn't from Google Play; that's expected.
+4. Open **Gift Inventory**, scan the pairing code from **Dashboard → Devices → Pair a phone**, and sign in.
+
+**Updating:** build again and install the new `.apk` over the old one. Data and pairing are kept.
+
+> Anyone with the build link can download the app. That's harmless on its own, because the app does nothing without a pairing code from your dashboard. To require an Expo sign-in for downloads, change it in the project's settings on expo.dev.
+
+### iPhone app
+
+iPhones need an Apple Developer account (Apple's paid program) to install apps outside the App Store, through TestFlight or registered devices. `ios.bundleIdentifier` in `apps/mobile/app.json` is still the placeholder `com.example.giftinventory` and must be set before the first iPhone build.
 
 ## Development
 

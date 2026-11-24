@@ -11,19 +11,24 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.example.giftinventory",
       "infoPlist": {
-        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true },
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
         "NSLocalNetworkUsageDescription": "Gift Inventory syncs with your team's server on the office Wi-Fi."
       }
     },
     "android": {
-      "package": "com.example.giftinventory",
+      "package": "com.kandog.giftinventory",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -37,8 +42,28 @@
           "barcodeScannerEnabled": true
         }
       ],
-      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
-    "experiments": { "typedRoutes": false }
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "98f4fce9-37cc-4569-821d-43f90f0f9fff"
+      }
+    },
+    "owner": "scottxu636"
   }
 }

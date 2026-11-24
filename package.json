@@ -10,7 +10,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:server": "npm run dev -w @gifts/server",
     "dev:dashboard": "npm run dev -w @gifts/dashboard",
-    "dev:mobile": "npm run start -w @gifts/mobile"
+    "dev:mobile": "npm run start -w @gifts/mobile",
+    "build:android": "npm run build:android -w @gifts/mobile"
   },
   "overrides": {
     "react": "19.3.0",
