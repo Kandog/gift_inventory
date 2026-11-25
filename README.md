@@ -13,16 +13,16 @@ Tracks promotional gifts (bags, pens, toys…) across Locations. A server on an 
 | `apps/server-py` | Python server: API + SQLite + backups, also serves the built dashboard. Started by `start-server.bat` |
 | `apps/server` | Original Node.js (Fastify) server, kept for reference; same API and database |
 | `apps/dashboard` | React admin dashboard (Vite) |
-| `apps/mobile` | Expo (React Native) phone app |
+| `apps/mobile` | Expo (React Native) phone app: Android `.apk`, iPhone, and a web version served by the server at `/app` |
 | `scripts` | Server install/uninstall, demo data |
 
 ## Install on the server PC
 
 1. Install **Python 3.10 or newer** from [python.org](https://www.python.org/downloads/). In the installer, tick **Add python.exe to PATH**. No administrator rights are needed ("Install for me only" is fine).
-2. Copy this folder to the PC (e.g. `C:\GiftInventory`), including the built dashboard in `apps\dashboard\dist`. To build it, run `npm run build -w @gifts/dashboard` on a development PC with Node.js.
+2. Copy this folder to the PC (e.g. `C:\GiftInventory`), including the built dashboard in `apps\dashboard\dist` and the phone web app in `apps\mobile\dist`. To build them, run `npm run build -w @gifts/dashboard` and `npm run build:phone-web` on a development PC with Node.js.
 3. Double-click **`start-server.bat`**. The first start sets up Python packages (needs internet, about a minute). The window then shows the dashboard address, e.g. `http://192.168.1.37:8080`.
 4. Open that address and create the first Admin.
-5. **Settings & backup**: set the backup folder to your network share (e.g. `\NAS\Backups\Gifts`) and press *Back up now* once to check it works. Backups run at 02:00 while the server is running.
+5. **Settings & backup**: set the backup folder to your network share (e.g. `\\NAS\Backups\Gifts`) and press *Back up now* once to check it works. Backups run at 02:00 while the server is running.
 6. In your router, give the PC a fixed IP (DHCP reservation). Make sure the PC doesn't sleep, or phones can't sync.
 
 **Phones can't connect?** The first time the server starts, Windows may ask whether Python may use the network. Allow it on **Private networks**. If Windows treats the office network as *Public*, change it to *Private* in Windows Settings → Network → your connection.
@@ -36,7 +36,7 @@ Data lives in `data\` (database `gifts.db`, `photos\`, `logs\server.log`). The P
 - **Start:** double-click `start-server.bat`. Keep the window open (minimise it) while the server should run.
 - **Stop:** close the window, or press **Ctrl+C** in it.
 - **Restart:** stop, then start.
-- **Change the port:** edit `GIFTS_PORT` near the top of `start-server.bat`.
+- **Change the ports:** edit `GIFTS_PORT` (dashboard, default 8080) and `GIFTS_HTTPS_PORT` (phone web app, default 8443) near the top of `start-server.bat`.
 - **Logs:** shown in the window, and saved to `data\logs\server.log`:
   ```powershell
   Get-Content data\logs\server.log -Tail 50
@@ -101,15 +101,55 @@ ID,Name,Category,Unit Cost,Low Stock Threshold,Packs,Barcodes,Archived,Stock: St
 
 ## Phones
 
-**For testing now:** install **Expo Go** from the App Store / Play Store, then on a dev PC on the same Wi-Fi:
+There are two ways to put the app on a phone:
+
+| | Web app (recommended) | Installed app |
+|---|---|---|
+| iPhone | ✅ No Apple account needed | Needs a paid Apple Developer account (TestFlight, below) |
+| Android | ✅ | ✅ `.apk` (below) |
+| Updates | Automatic: rebuild on the PC, phones get it next time they open the app | Install each new build |
+
+### Web app (iPhone and Android)
+
+The server also serves the phone app as a web page at `https://<PC address>:8443/app`. Added to the home screen, it opens full-screen with its own icon, like an installed app. Scanning, offline entries and sync work as in the installed app.
+
+**On the server PC (once, and after each change to the phone app):** on a PC with Node.js, in the project folder, run:
+
+```powershell
+npm run build:phone-web
+```
+
+This creates `apps\mobile\dist`. Copy that folder to the server PC (same place) and restart the server. Phones pick up the new version the next time they open the app while on the office Wi-Fi.
+
+**On each phone (once):** the phone must be on the office Wi-Fi. Open the **Phone setup** address in the phone's browser: Safari on iPhone, Chrome on Android. It is `http://<PC address>:8080/phone`, e.g. `http://192.168.1.37:8080/phone`, and is also shown on the dashboard under **Settings & backup** and in the server window. The page has the steps and buttons for the following.
+
+1. **Install the security certificate.** Browsers allow the camera only on HTTPS, and the PC makes its own HTTPS certificate. Each phone has to trust it once.
+   - **iPhone:** tap **Download certificate**, then **Allow**. Open **Settings** → **Profile Downloaded** (or **General → VPN & Device Management**) → **Install**, and enter the passcode. Then go to **Settings → General → About → Certificate Trust Settings** and turn on **Gift Inventory local CA**.
+   - **Android:** tap **Download certificate**. Open **Settings**, search for **CA certificate** (usually **Security → More security settings → Encryption & credentials → Install a certificate → CA certificate**), tap **Install anyway** and choose `gift-inventory-ca.crt` from Downloads.
+2. **Open the app:** tap **Open Gift Inventory** on the setup page (`https://<PC address>:8443/app`).
+3. **Add it to the home screen:**
+   - **iPhone (Safari):** tap **Share** (the square with an arrow), then **Add to Home Screen**.
+   - **Android (Chrome):** tap **⋮**, then **Add to Home screen** or **Install app**.
+4. **Connect:** open **Gift Inventory** from the home screen. On the PC dashboard open **Devices → Pair a phone**, then scan the code in the app or tap **Type the code instead**. Sign in.
+
+**About the certificate:** the PC creates a private certificate authority, valid for 20 years. That's what phones install. It signs the server's HTTPS certificate, which is valid for 825 days, the longest iPhones accept. The server renews that certificate by itself before it expires, and when the PC's IP address changes, so phones never need to install anything again. Both are stored in `data\certs`. Keep that folder (it's included when you copy `data`). If it is deleted, every phone has to install the new certificate.
+
+**Troubleshooting:**
+- *"This connection is not private" / "Not secure"*: the certificate isn't installed or trusted yet (on iPhone, check **Certificate Trust Settings**).
+- *Can't open the setup page*: check the phone is on the office Wi-Fi, and that Windows allowed Python on Private networks (see above). Port 8443 must be allowed too; Windows asks for Python once, which covers both ports.
+- *The app shows old screens after an update*: close it completely and open it again while on the office Wi-Fi.
+- *iPhone and storage*: entries waiting to sync are kept in the web app's storage. Open the app on the office Wi-Fi at least every few days so they sync.
+- The HTTPS port is set by `GIFTS_HTTPS_PORT` in `start-server.bat` (default `8443`; `0` turns the web app off).
+
+### Expo Go (development only)
+
+Install **Expo Go** from the App Store / Play Store, then on a dev PC on the same Wi-Fi:
 
 ```powershell
 npm run dev:mobile
 ```
 
 Scan the QR code shown with Expo Go (Android) or the Camera app (iPhone). In the app, scan the pairing code from **Dashboard → Devices → Pair a phone**, then sign in.
-
-**For everyday use** the app needs a real build. Expo Go is for development only.
 
 ### Android app (.apk)
 

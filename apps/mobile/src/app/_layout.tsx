@@ -4,6 +4,7 @@ import { enableLegacyHeaderAppearance, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { init, useStore } from '@/lib/store';
+import { webSetup } from '@/lib/webSetup';
 
 // On iOS 26+ the header is transparent by default and screens draw underneath it, which hid
 // (and blocked taps on) the sync bar and the entry type buttons at the top of the home screen.
@@ -13,6 +14,7 @@ enableLegacyHeaderAppearance();
 export default function RootLayout() {
   const phase = useStore((s) => s.phase);
   useEffect(() => {
+    webSetup();
     void init();
   }, []);
 

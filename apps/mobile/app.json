@@ -55,7 +55,8 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": false
+      "typedRoutes": false,
+      "baseUrl": "/app"
     },
     "extra": {
       "router": {
@@ -67,6 +68,15 @@
         "projectId": "98f4fce9-37cc-4569-821d-43f90f0f9fff"
       }
     },
-    "owner": "scottxu636"
+    "owner": "scottxu636",
+    "web": {
+      "output": "single",
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "Gift Inventory",
+      "shortName": "Gifts",
+      "themeColor": "#ffffff",
+      "backgroundColor": "#ffffff"
+    }
   }
 }

@@ -18,6 +18,7 @@ import {
 } from '@gifts/shared';
 import { HttpError, OfflineError, request } from './client';
 import { KEYS, kv, secure } from './storage';
+import { webOrigin } from './webSetup';
 
 /** What the user is recording on the phone. Receive unless changed in Settings. */
 export type EntryType = EntryKind;
@@ -126,7 +127,8 @@ export async function init() {
   ]);
   // Older versions stored `mode: 'count' | 'movement'`; anything that is not an entry type starts as Receive.
   const prefs: Prefs = { entryType: isEntryType(savedPrefs.entryType) ? savedPrefs.entryType : 'receive', locationId: savedPrefs.locationId ?? null };
-  const servers: string[] = serversRaw ? JSON.parse(serversRaw) : [];
+  // In the browser version the PC that served the page is the server.
+  const servers: string[] = webOrigin ? (deviceToken ? [webOrigin] : []) : serversRaw ? JSON.parse(serversRaw) : [];
   const phase = !deviceToken || servers.length === 0 ? 'unpaired' : sessionToken && user ? 'ready' : 'signed-out';
   set({ phase, servers, user, catalog, outbox, history, problems, prefs, lastSyncAt });
   if (phase === 'ready') void syncNow();
@@ -152,6 +154,7 @@ export async function pair(input: { qr?: string; server?: string; code?: string 
     servers = [/^https?:\/\//.test(s) ? s : `http://${s.includes(':') ? s : `${s}:8080`}`];
     code = (input.code ?? '').trim();
   }
+  if (webOrigin) servers = [webOrigin]; // the browser can only reach the server that served the page
   const { data, server } = await request<{ deviceToken: string }>(servers, 'POST', '/api/devices/pair', { body: { code, name: deviceName } });
   const ordered = [server, ...servers.filter((s) => s !== server)];
   await secure.set(KEYS.servers, JSON.stringify(ordered));

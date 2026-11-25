@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@gifts/shared": "*",
+    "barcode-detector": "^3.0.0",
     "expo": "~58.0.26",
     "expo-build-properties": "~58.0.12",
     "expo-camera": "~58.0.14",
@@ -15,9 +16,11 @@
     "expo-sqlite": "~58.0.18",
     "expo-status-bar": "~58.0.5",
     "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-safe-area-context": "~5.11.1",
-    "react-native-screens": "~4.30.1"
+    "react-native-screens": "~4.30.1",
+    "react-native-web": "^0.21.4"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
@@ -30,7 +33,8 @@
     "web": "expo start --web",
     "typecheck": "tsc -p . --noEmit",
     "build:android": "npx eas-cli@latest build --platform android --profile preview",
-    "build:ios": "npx eas-cli@latest build --platform ios --profile production --auto-submit"
+    "build:ios": "npx eas-cli@latest build --platform ios --profile production --auto-submit",
+    "build:web": "node ../../scripts/build-phone-web.mjs"
   },
   "private": true
 }

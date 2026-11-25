@@ -3,7 +3,8 @@ rem Starts the Gift Inventory server (API + dashboard). No administrator rights 
 rem Double-click this file, or run it from a Command Prompt. Close the window or press Ctrl+C to stop.
 rem
 rem The first start creates a private Python environment in apps\server-py\.venv and installs
-rem the two packages the server needs (openpyxl for Excel, reportlab for label PDFs).
+rem the packages the server needs (openpyxl for Excel, reportlab for label PDFs,
+rem cryptography for the HTTPS certificate).
 
 setlocal
 cd /d "%~dp0"
@@ -11,6 +12,8 @@ title Gift Inventory server
 
 rem ---- Settings: change these if needed ----
 if not defined GIFTS_PORT set GIFTS_PORT=8080
+rem HTTPS port for the phone web app (https://this-PC:8443/app). Set to 0 to turn it off.
+if not defined GIFTS_HTTPS_PORT set GIFTS_HTTPS_PORT=8443
 rem Uncomment to keep the data somewhere else (default: the "data" folder next to this file).
 rem set GIFTS_DATA_DIR=D:\GiftInventoryData
 

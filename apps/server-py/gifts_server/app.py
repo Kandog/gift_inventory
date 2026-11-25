@@ -16,6 +16,7 @@ from . import auth, reports, sheets, store
 from .backup import run_backup
 from .db import Db, get_setting, set_setting
 from .labels import SHEETS, render_labels_pdf
+from .phone import PhoneApp
 from .util import DomainError, js_number, now_iso, now_ms, text
 
 COOKIE = 'gifts_sid'
@@ -158,11 +159,22 @@ KIND_LABEL = {'count': 'Count', 'receive': 'Receive', 'issue': 'Issue', 'transfe
 
 
 class App:
-    def __init__(self, db: Db, data_dir: str, port: int, dashboard_dir: str | None = None):
+    def __init__(
+        self,
+        db: Db,
+        data_dir: str,
+        port: int,
+        dashboard_dir: str | None = None,
+        phone_dir: str | None = None,
+        https_port: int | None = None,
+        certs=None,
+    ):
         self.db = db
         self.data_dir = data_dir
         self.port = port
         self.dashboard_dir = dashboard_dir if dashboard_dir and os.path.isdir(dashboard_dir) else None
+        # The browser version of the phone app (apps/mobile/dist), served at /app over HTTPS.
+        self.phone = PhoneApp(phone_dir, port, https_port, certs)
         self.photos_dir = os.path.join(data_dir, 'photos')
         # One request at a time touches the database, as in the single-threaded Node server.
         self.lock = threading.RLock()
@@ -180,7 +192,7 @@ class App:
 
         return deco
 
-    def handle(self, method: str, url: str, headers: dict, body: bytes = b'') -> Response:
+    def handle(self, method: str, url: str, headers: dict, body: bytes = b'', secure: bool = False) -> Response:
         parts = urlsplit(url)
         path = unquote(parts.path)
         query = {k: v[0] for k, v in parse_qs(parts.query, keep_blank_values=True).items()}
@@ -188,6 +200,10 @@ class App:
         try:
             if len(body) > BODY_LIMIT:
                 raise DomainError('Request body is too large', 413)
+            if req.method in ('GET', 'HEAD'):
+                phone = self.phone.handle(path, req.headers.get('host', ''), secure, lan_addresses)
+                if phone is not None:
+                    return phone
             for m, regex, fn in self.routes:
                 match = regex.match(path)
                 if match and m == req.method:
@@ -625,6 +641,8 @@ class App:
                 'lastBackupError': get_setting(db, 'backup.lastError') or None,
                 'dataDir': self.data_dir,
                 'addresses': self.servers(),
+                'phoneAppAddresses': self.phone.app_urls(lan_addresses()),
+                'phoneSetupAddresses': self.phone.setup_urls(lan_addresses()),
             }
 
         @r('PUT', '/api/settings')

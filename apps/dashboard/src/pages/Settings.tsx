@@ -9,6 +9,8 @@ interface Settings {
   lastBackupError: string | null;
   dataDir: string;
   addresses: string[];
+  /** http://<pc>:8080/phone: setup steps for the phone web app (empty when HTTPS is off). */
+  phoneSetupAddresses?: string[];
 }
 
 export function SettingsPage() {
@@ -101,6 +103,14 @@ export function SettingsPage() {
               <li key={a}>
                 <span>Network address</span>
                 <code>{a}</code>
+              </li>
+            ))}
+            {(data.phoneSetupAddresses ?? []).map((a) => (
+              <li key={a}>
+                <span>Phone setup (open on the phone)</span>
+                <a href={a} target="_blank" rel="noreferrer">
+                  <code>{a}</code>
+                </a>
               </li>
             ))}
           </ul>
