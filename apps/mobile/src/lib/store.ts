@@ -8,6 +8,7 @@ import {
   type BarcodeLink,
   type CatalogSnapshot,
   type Entry,
+  type EntryKind,
   type GiftEvent,
   type NewEvent,
   type SyncPush,
@@ -18,7 +19,16 @@ import {
 import { HttpError, OfflineError, request } from './client';
 import { KEYS, kv, secure } from './storage';
 
-export type EntryMode = 'count' | 'movement';
+/** What the user is recording on the phone. Picked on the home screen at each app start. */
+export type EntryType = EntryKind;
+export const ENTRY_TYPES: { value: EntryType; label: string; hint: string }[] = [
+  { value: 'count', label: 'Count', hint: 'The number you enter replaces the stock at this Location.' },
+  { value: 'receive', label: 'Receive', hint: 'New stock arrived. The number is added.' },
+  { value: 'issue', label: 'Issue', hint: 'Given out at an Event. The number is taken off.' },
+  { value: 'transfer', label: 'Transfer', hint: 'Moved from one Location to another.' },
+  { value: 'writeoff', label: 'Write-off', hint: 'Lost or damaged. The number is taken off.' },
+];
+const isEntryType = (v: unknown): v is EntryType => ENTRY_TYPES.some((t) => t.value === v);
 
 type OutboxItem =
   | { id: string; userId: string; kind: 'event'; data: NewEvent }
@@ -41,7 +51,7 @@ export interface Problem {
 }
 
 interface Prefs {
-  mode: EntryMode | null;
+  entryType: EntryType | null;
   locationId: string | null;
 }
 
@@ -58,8 +68,10 @@ export interface State {
   online: boolean | null;
   syncError: string | null;
   prefs: Prefs;
-  /** The Entry Mode question is asked once per app start. */
-  modeConfirmed: boolean;
+  /** The entry type question is asked once per app start. */
+  typeConfirmed: boolean;
+  /** The Gift picked on the home screen (by scan, search or barcode link), not saved yet. */
+  pickedGiftId: string | null;
   notice: string | null;
 }
 
@@ -75,8 +87,9 @@ let state: State = {
   syncing: false,
   online: null,
   syncError: null,
-  prefs: { mode: null, locationId: null },
-  modeConfirmed: false,
+  prefs: { entryType: null, locationId: null },
+  typeConfirmed: false,
+  pickedGiftId: null,
   notice: null,
 };
 
@@ -105,15 +118,17 @@ async function persist(patch: Partial<Pick<State, 'outbox' | 'history' | 'proble
 
 export async function init() {
   const [serversRaw, deviceToken, sessionToken] = await Promise.all([secure.get(KEYS.servers), secure.get(KEYS.deviceToken), secure.get(KEYS.sessionToken)]);
-  const [user, catalog, outbox, history, problems, prefs, lastSyncAt] = await Promise.all([
+  const [user, catalog, outbox, history, problems, savedPrefs, lastSyncAt] = await Promise.all([
     kv.get<User | null>(KEYS.user, null),
     kv.get<CatalogSnapshot | null>(KEYS.catalog, null),
     kv.get<OutboxItem[]>(KEYS.outbox, []),
     kv.get<HistoryItem[]>(KEYS.history, []),
     kv.get<Problem[]>(KEYS.problems, []),
-    kv.get<Prefs>(KEYS.prefs, { mode: null, locationId: null }),
+    kv.get<Partial<Prefs>>(KEYS.prefs, {}),
     kv.get<string | null>(KEYS.lastSyncAt, null),
   ]);
+  // Older versions stored `mode: 'count' | 'movement'`; anything that is not an entry type is asked again.
+  const prefs: Prefs = { entryType: isEntryType(savedPrefs.entryType) ? savedPrefs.entryType : null, locationId: savedPrefs.locationId ?? null };
   const servers: string[] = serversRaw ? JSON.parse(serversRaw) : [];
   const phase = !deviceToken || servers.length === 0 ? 'unpaired' : sessionToken && user ? 'ready' : 'signed-out';
   set({ phase, servers, user, catalog, outbox, history, problems, prefs, lastSyncAt });
@@ -153,7 +168,7 @@ export async function login(username: string, password: string) {
     const { data } = await call<{ token: string; user: User }>('POST', '/api/auth/device-login', { deviceToken, username, password }, false);
     await secure.set(KEYS.sessionToken, data.token);
     await persist({ user: data.user });
-    set({ phase: 'ready', modeConfirmed: false, notice: null });
+    set({ phase: 'ready', typeConfirmed: false, pickedGiftId: null, notice: null });
     void syncNow();
   } catch (e) {
     if (e instanceof HttpError && /not paired|revoked/i.test(e.message)) await forgetDevice();
@@ -166,23 +181,24 @@ export async function logout() {
   const token = await secure.get(KEYS.sessionToken);
   if (token) call('POST', '/api/auth/logout', {}, true).catch(() => undefined);
   await secure.del(KEYS.sessionToken);
-  set({ phase: 'signed-out', modeConfirmed: false });
+  set({ phase: 'signed-out', typeConfirmed: false, pickedGiftId: null });
 }
 
 /** Unpairs this phone. Unsynced entries are lost, so the UI warns first. */
 export async function forgetDevice() {
   await Promise.all([secure.del(KEYS.deviceToken), secure.del(KEYS.sessionToken), secure.del(KEYS.servers)]);
   await Promise.all(Object.values(KEYS).map((k) => kv.del(k)));
-  set({ phase: 'unpaired', servers: [], user: null, catalog: null, outbox: [], history: [], problems: [], lastSyncAt: null, modeConfirmed: false });
+  set({ phase: 'unpaired', servers: [], user: null, catalog: null, outbox: [], history: [], problems: [], lastSyncAt: null, typeConfirmed: false, pickedGiftId: null });
 }
 
 export async function setPrefs(patch: Partial<Prefs>) {
   await persist({ prefs: { ...state.prefs, ...patch } });
 }
-export const confirmMode = async (mode: EntryMode) => {
-  await setPrefs({ mode });
-  set({ modeConfirmed: true });
+export const chooseEntryType = async (entryType: EntryType) => {
+  await setPrefs({ entryType });
+  set({ typeConfirmed: true });
 };
+export const pickGift = (giftId: string | null) => set({ pickedGiftId: giftId });
 export const dismissNotice = () => set({ notice: null });
 
 // ---------- recording ----------

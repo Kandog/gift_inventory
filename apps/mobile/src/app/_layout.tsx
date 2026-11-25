@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { init, useStore } from '@/lib/store';
 
 // On iOS 26+ the header is transparent by default and screens draw underneath it, which hid
-// (and blocked taps on) the sync bar and the Entry Mode switch at the top of the home screen.
+// (and blocked taps on) the sync bar and the entry type buttons at the top of the home screen.
 // Keep the opaque header with content below it, as on Android and older iOS.
 enableLegacyHeaderAppearance();
 
@@ -36,9 +36,6 @@ export default function RootLayout() {
         </Stack.Protected>
         <Stack.Protected guard={phase === 'ready'}>
           <Stack.Screen name="index" options={{ title: 'Gift Inventory' }} />
-          <Stack.Screen name="mode" options={{ title: 'Entry Mode', presentation: 'modal' }} />
-          <Stack.Screen name="scan" options={{ title: 'Scan', headerShown: false }} />
-          <Stack.Screen name="entry" options={{ title: 'Record' }} />
           <Stack.Screen name="link" options={{ title: 'Unknown barcode' }} />
           <Stack.Screen name="history" options={{ title: 'My entries' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
