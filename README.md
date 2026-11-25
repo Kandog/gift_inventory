@@ -10,55 +10,38 @@ Tracks promotional gifts (bags, pens, toys…) across Locations. A server on an 
 | Folder | What |
 |---|---|
 | `packages/shared` | Domain rules shared by server and phone: stock calculation, validation, Void window, Event auto-close, scanning |
-| `apps/server` | Fastify API + SQLite + backups, also serves the built dashboard |
+| `apps/server-py` | Python server: API + SQLite + backups, also serves the built dashboard. Started by `start-server.bat` |
+| `apps/server` | Original Node.js (Fastify) server, kept for reference; same API and database |
 | `apps/dashboard` | React admin dashboard (Vite) |
 | `apps/mobile` | Expo (React Native) phone app |
 | `scripts` | Server install/uninstall, demo data |
 
 ## Install on the server PC
 
-1. Install **Node.js 24 LTS** from nodejs.org.
-2. Copy this folder to the PC (e.g. `C:\GiftInventory`).
-3. Open **PowerShell as administrator** in that folder and run:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts\install-server.ps1 -DisableSleep
-   ```
-   Enter the Windows account the server should run as. It must be able to write to your backup share.
-4. Open the dashboard address it prints (e.g. `http://192.168.1.37:8080`) and create the first Admin.
-5. **Settings & backup**: set the backup folder to your network share (e.g. `\\NAS\Backups\Gifts`) and press *Back up now* once to check it works.
-6. In your router, give the PC a fixed IP (DHCP reservation).
+1. Install **Python 3.10 or newer** from [python.org](https://www.python.org/downloads/). In the installer, tick **Add python.exe to PATH**. No administrator rights are needed ("Install for me only" is fine).
+2. Copy this folder to the PC (e.g. `C:\GiftInventory`), including the built dashboard in `apps\dashboard\dist`. To build it, run `npm run build -w @gifts/dashboard` on a development PC with Node.js.
+3. Double-click **`start-server.bat`**. The first start sets up Python packages (needs internet, about a minute). The window then shows the dashboard address, e.g. `http://192.168.1.37:8080`.
+4. Open that address and create the first Admin.
+5. **Settings & backup**: set the backup folder to your network share (e.g. `\NAS\Backups\Gifts`) and press *Back up now* once to check it works. Backups run at 02:00 while the server is running.
+6. In your router, give the PC a fixed IP (DHCP reservation). Make sure the PC doesn't sleep, or phones can't sync.
 
-Data lives in `data\` (database `gifts.db`, `photos\`, `logs\server.log`). To remove: `scripts\uninstall-server.ps1` (data is kept).
+**Phones can't connect?** The first time the server starts, Windows may ask whether Python may use the network. Allow it on **Private networks**. If Windows treats the office network as *Public*, change it to *Private* in Windows Settings → Network → your connection.
+
+Data lives in `data\` (database `gifts.db`, `photos\`, `logs\server.log`). The Python server uses the same database as the old Node server, so existing data, Users and paired phones keep working.
+
+**Moving from the old Node.js startup task:** if `scripts\install-server.ps1` was run on this PC, remove that task once so it doesn't hold port 8080. In PowerShell as administrator: `scripts\uninstall-server.ps1` (data is kept).
 
 ## Managing the server
 
-Run these in **PowerShell as administrator** in the install folder (e.g. `C:\GiftInventory`).
-
-**Check that it is running:**
-
-```powershell
-Get-ScheduledTask GiftInventory | Select-Object TaskName, State
-```
-
-**See the latest log lines:**
-
-```powershell
-Get-Content data\logs\server.log -Tail 50
-```
-
-**Stop the server.** Stopping the task alone leaves Node running, so this also ends the server's Node process:
-
-```powershell
-Stop-ScheduledTask GiftInventory; Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object CommandLine -like '*apps\server\src\main.ts*' | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-```
-
-**Start the server:**
-
-```powershell
-Start-ScheduledTask GiftInventory
-```
-
-**Restart:** run the stop command, then the start command.
+- **Start:** double-click `start-server.bat`. Keep the window open (minimise it) while the server should run.
+- **Stop:** close the window, or press **Ctrl+C** in it.
+- **Restart:** stop, then start.
+- **Change the port:** edit `GIFTS_PORT` near the top of `start-server.bat`.
+- **Logs:** shown in the window, and saved to `data\logs\server.log`:
+  ```powershell
+  Get-Content data\logs\server.log -Tail 50
+  ```
+- **Start with Windows (optional):** press Win+R, type `shell:startup`, and put a shortcut to `start-server.bat` in that folder. It then starts when you sign in to Windows.
 
 ### Reset the server: delete all data, including demo data
 
@@ -66,12 +49,12 @@ Start-ScheduledTask GiftInventory
 
 Use it to remove demo data (from `node scripts/seed-demo.mjs`, or a `data` folder copied from a development PC) and start clean.
 
-1. Stop the server (command above).
+1. Stop the server (close its window).
 2. Delete the data. The `logs` folder is kept because the server writes to it:
    ```powershell
    Remove-Item data\gifts.db, data\gifts.db-wal, data\gifts.db-shm, data\photos, data\dev-credentials.txt -Recurse -Force -ErrorAction SilentlyContinue
    ```
-3. Start the server (command above).
+3. Start the server (`start-server.bat`).
 4. Open the dashboard. It shows **“Create the first Admin”** again.
 5. Re-pair every phone: in the app, **Settings → Disconnect this phone**, then scan a new code from **Devices → Pair a phone**.
 
@@ -206,6 +189,7 @@ npm test
 npm run typecheck
 npm run dev:server
 npm run dev:dashboard
+python -m unittest discover -s apps/server-py/tests
 ```
 
 `dev:server` serves the API on :8080. `dev:dashboard` serves the dashboard on :5173 and proxies `/api` to the server.
