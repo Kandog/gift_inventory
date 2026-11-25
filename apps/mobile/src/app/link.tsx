@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { searchGifts } from '@gifts/shared';
-import { createGiftOnline, linkBarcode, useStore } from '@/lib/store';
+import { createGiftOnline, getState, linkBarcode, pickGift, useStore } from '@/lib/store';
 import { Button, Card, ErrorText, Field, H, Input, Muted, Row, Screen, Segmented } from '@/ui';
 
 /** A scanned Barcode no Gift has yet: link it to an existing Gift, or (Admins, online) create a new Gift. */
@@ -26,7 +26,8 @@ export default function LinkScreen() {
         text: 'Link',
         onPress: async () => {
           await linkBarcode(giftId, code);
-          router.replace({ pathname: '/entry', params: { giftId } });
+          pickGift(giftId);
+          router.back();
         },
       },
     ]);
@@ -36,6 +37,8 @@ export default function LinkScreen() {
     setError(null);
     try {
       await createGiftOnline(name.trim(), categoryId, code);
+      const created = getState().catalog?.gifts.find((g) => g.barcodes.includes(code));
+      if (created) pickGift(created.id);
       router.back();
     } catch (e) {
       setError((e as Error).message);

@@ -55,7 +55,7 @@ The quantity of one Gift at one Location. A Gift's total stock is the sum across
 _Avoid_: Balance, inventory
 
 **Entry Mode**:
-The way a user records quantities on the phone: either **Count** or **Movement**. The user picks it at app start and can change it later.
+What a user records on the phone: **Count**, **Receive**, **Issue**, **Transfer** or **Write-off**. It is Receive unless the user changes it in Settings, and the phone remembers the last choice.
 
 **Count**:
 An entry that states the absolute quantity of a Gift someone physically counted at one Location, such as "there are 42 in the Storeroom". It replaces that Stock Level.
