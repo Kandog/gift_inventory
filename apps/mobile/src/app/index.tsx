@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
-import { Redirect, Stack, useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { resolveScan, searchGifts } from '@gifts/shared';
 import { EntryForm } from '@/components/EntryForm';
 import { Scanner } from '@/components/Scanner';
@@ -10,10 +10,9 @@ import { Button, Card, color, H, Input, Muted, Row, Screen } from '@/ui';
 
 const MAX_LIST = 50;
 
-/** The recording flow on one screen: Gift (scan or type), how many, Save. The entry type is chosen on /start. */
+/** The recording flow on one screen: Gift (scan or type), how many, Save. The entry type is changed in Settings. */
 export default function HomeScreen() {
   const router = useRouter();
-  const typeConfirmed = useStore((s) => s.typeConfirmed);
   const type = useStore((s) => s.prefs.entryType);
   const catalog = useStore((s) => s.catalog);
   const user = useStore((s) => s.user);
@@ -48,7 +47,6 @@ export default function HomeScreen() {
     else Alert.alert('Gift not on this phone yet', 'This label is for a Gift this phone has not downloaded. Sync on the office Wi-Fi and try again.');
   };
 
-  if (!typeConfirmed || !type) return <Redirect href="/start" />;
   const typeInfo = ENTRY_TYPES.find((t) => t.value === type)!;
 
   return (
@@ -65,13 +63,8 @@ export default function HomeScreen() {
       <SyncBar />
 
       <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ flex: 1 }}>
-            <H>{typeInfo.label}</H>
-            <Muted>{typeInfo.hint}</Muted>
-          </View>
-          <Button kind="secondary" title="Change" onPress={() => router.push('/start')} />
-        </View>
+        <H>{typeInfo.label}</H>
+        <Muted>{typeInfo.hint} Change it in Settings ⚙︎.</Muted>
       </Card>
 
       {saved && (

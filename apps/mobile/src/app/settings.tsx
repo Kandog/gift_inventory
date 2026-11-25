@@ -1,11 +1,13 @@
 import { Alert, Text } from 'react-native';
+import { useRouter } from 'expo-router';
 import { chooseEntryType, forgetDevice, logout, syncNow, useStore } from '@/lib/store';
 import { EntryTypePicker } from '@/components/EntryTypePicker';
 import { SyncBar } from '@/components/SyncBar';
 import { ago, Button, Card, H, Muted, Screen } from '@/ui';
 
 export default function SettingsScreen() {
-  const entryType = useStore((s) => (s.typeConfirmed ? s.prefs.entryType : null));
+  const router = useRouter();
+  const entryType = useStore((s) => s.prefs.entryType);
   const user = useStore((s) => s.user);
   const servers = useStore((s) => s.servers);
   const lastSyncAt = useStore((s) => s.lastSyncAt);
@@ -17,7 +19,11 @@ export default function SettingsScreen() {
       <SyncBar />
       <Card>
         <H>What are you doing?</H>
-        <EntryTypePicker value={entryType} onChange={(t) => void chooseEntryType(t)} />
+        <EntryTypePicker value={entryType} onChange={async (t) => {
+            await chooseEntryType(t);
+            if (router.canGoBack()) router.back();
+            else router.replace('/');
+          }} />
       </Card>
       <Card>
         <H>{user?.displayName}</H>
