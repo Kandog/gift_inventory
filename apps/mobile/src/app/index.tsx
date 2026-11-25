@@ -4,9 +4,8 @@ import { Stack, useRouter } from 'expo-router';
 import { resolveScan, searchGifts } from '@gifts/shared';
 import { EntryForm } from '@/components/EntryForm';
 import { Scanner } from '@/components/Scanner';
-import { SyncBar } from '@/components/SyncBar';
-import { ENTRY_TYPES, getState, pickGift, useStore } from '@/lib/store';
-import { Button, Card, color, H, Input, Muted, Row, Screen } from '@/ui';
+import { getState, pickGift, useStore } from '@/lib/store';
+import { Button, Card, color, Input, Muted, Row, Screen } from '@/ui';
 
 const MAX_LIST = 50;
 
@@ -47,8 +46,6 @@ export default function HomeScreen() {
     else Alert.alert('Gift not on this phone yet', 'This label is for a Gift this phone has not downloaded. Sync on the office Wi-Fi and try again.');
   };
 
-  const typeInfo = ENTRY_TYPES.find((t) => t.value === type)!;
-
   return (
     <Screen>
       <Stack.Screen
@@ -60,12 +57,6 @@ export default function HomeScreen() {
           ),
         }}
       />
-      <SyncBar />
-
-      <Card>
-        <H>{typeInfo.label}</H>
-        <Muted>{typeInfo.hint} Change it in Settings ⚙︎.</Muted>
-      </Card>
 
       {saved && (
         <Card style={{ borderColor: color.ok, backgroundColor: '#e3f4e9' }}>
