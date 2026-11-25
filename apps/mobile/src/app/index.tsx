@@ -16,6 +16,7 @@ export default function HomeScreen() {
   const catalog = useStore((s) => s.catalog);
   const user = useStore((s) => s.user);
   const pickedGiftId = useStore((s) => s.pickedGiftId);
+  const problems = useStore((s) => s.problems.length);
   const [query, setQuery] = useState('');
   const [scanning, setScanning] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -57,6 +58,14 @@ export default function HomeScreen() {
           ),
         }}
       />
+
+      {problems > 0 && (
+        <Pressable onPress={() => router.push('/history')} accessibilityRole="button">
+          <Text style={{ color: color.danger, fontWeight: '600' }}>
+            {problems} entr{problems === 1 ? 'y was' : 'ies were'} refused by the server. Tap to see.
+          </Text>
+        </Pressable>
+      )}
 
       {saved && (
         <Card style={{ borderColor: color.ok, backgroundColor: '#e3f4e9' }}>
