@@ -36,6 +36,7 @@ export default function RootLayout() {
         </Stack.Protected>
         <Stack.Protected guard={phase === 'ready'}>
           <Stack.Screen name="index" options={{ title: 'Gift Inventory' }} />
+          <Stack.Screen name="start" options={{ title: 'Gift Inventory' }} />
           <Stack.Screen name="link" options={{ title: 'Unknown barcode' }} />
           <Stack.Screen name="history" options={{ title: 'My entries' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />

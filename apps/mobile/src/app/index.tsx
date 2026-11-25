@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Redirect, Stack, useRouter } from 'expo-router';
 import { resolveScan, searchGifts } from '@gifts/shared';
 import { EntryForm } from '@/components/EntryForm';
-import { EntryTypePicker } from '@/components/EntryTypePicker';
 import { Scanner } from '@/components/Scanner';
 import { SyncBar } from '@/components/SyncBar';
-import { chooseEntryType, getState, pickGift, useStore } from '@/lib/store';
+import { ENTRY_TYPES, getState, pickGift, useStore } from '@/lib/store';
 import { Button, Card, color, H, Input, Muted, Row, Screen } from '@/ui';
 
 const MAX_LIST = 50;
 
-/** The whole recording flow on one screen: entry type, Gift (scan or type), how many, Save. */
+/** The recording flow on one screen: Gift (scan or type), how many, Save. The entry type is chosen on /start. */
 export default function HomeScreen() {
   const router = useRouter();
   const typeConfirmed = useStore((s) => s.typeConfirmed);
@@ -34,7 +33,6 @@ export default function HomeScreen() {
   }, [catalog]);
   const gifts = useMemo(() => searchGifts(query, catalog?.gifts ?? [], categoryName), [query, catalog, categoryName]);
   const gift = catalog?.gifts.find((g) => g.id === pickedGiftId) ?? null;
-  const ready = typeConfirmed && type;
 
   const choose = (giftId: string) => {
     setSaved(null);
@@ -50,6 +48,9 @@ export default function HomeScreen() {
     else Alert.alert('Gift not on this phone yet', 'This label is for a Gift this phone has not downloaded. Sync on the office Wi-Fi and try again.');
   };
 
+  if (!typeConfirmed || !type) return <Redirect href="/start" />;
+  const typeInfo = ENTRY_TYPES.find((t) => t.value === type)!;
+
   return (
     <Screen>
       <Stack.Screen
@@ -63,10 +64,15 @@ export default function HomeScreen() {
       />
       <SyncBar />
 
-      <View style={{ gap: 6 }}>
-        <H>What are you doing?</H>
-        <EntryTypePicker value={ready ? type : null} onChange={(t) => void chooseEntryType(t)} />
-      </View>
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <H>{typeInfo.label}</H>
+            <Muted>{typeInfo.hint}</Muted>
+          </View>
+          <Button kind="secondary" title="Change" onPress={() => router.push('/start')} />
+        </View>
+      </Card>
 
       {saved && (
         <Card style={{ borderColor: color.ok, backgroundColor: '#e3f4e9' }}>
@@ -74,7 +80,7 @@ export default function HomeScreen() {
         </Card>
       )}
 
-      {ready && gift && (
+      {gift && (
         <EntryForm
           key={gift.id}
           gift={gift}
@@ -88,7 +94,7 @@ export default function HomeScreen() {
         />
       )}
 
-      {ready && !gift && (
+      {!gift && (
         <>
           {scanning ? (
             <View style={{ height: 320, borderRadius: 12, overflow: 'hidden' }}>
